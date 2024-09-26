@@ -526,3 +526,135 @@ getenforce
   ![preview](images/linux59.png)
   ![preview](images/linux61.png)
 
+### Setting database for our application
+* Setup database manually
+  * Install
+  * Configure
+  * Security
+* On Vm-02, we will configure database.
+#### Steps:
+1. Install mysql server
+```bash
+yum install mysql-server -y
+```
+2. Now start the mysqldb service.
+```bash
+service mysqld start
+```
+3. Now install mysql
+```bash
+mysql-secure-installation
+# Set the password
+```
+  ![preview](images/linux62.png)
+
+4. Now server is converted to database server.
+5. To connect with the database server.
+```bash
+mysql -u root -p
+# Enter the password
+```
+  ![preview](images/linux63.png)
+
+6. Now we are inside the mysql database server.
+7. Create a database, table.
+```sql
+CREATE DATABASE appdata;
+USE appdata;
+SHOW TABLES;
+CREATE TABLE MyUsers(FirstName VARCHAR(30) NOT NULL, LastName VARCHAR(30) NOT NULL);
+SHOW TABLES;
+```
+ ![preview](images/linux64.png)
+
+8. Create an user, so that the data form vm-01 would update the data in database using this user.
+```sql
+CREATE USER 'app1'@'192.168.160.128' IDENTIFIED BY 'app1@123';
+``` 
+9. For the user we created we should give permissions to update the database.
+```sql
+GRANT ALL PRIVILEGES ON appdata.* TO 'app1'@'192.168.160.128';
+FLUSH PRIVILEGES;
+SHOW GRANTS FOR 'app1'@'192.168.160.128';
+```
+  ![preview](images/linux65.png)
+
+### Integration with database with application server.
+#### Steps in Vm-01:
+1. In Vm-01, change the code in main.py use below code.
+
+```python
+from flask import Flask, render_template, request
+from flask_mysqldb import MySQL
+app = Flask(__name__, template_folder='/app1/templates/')
+
+
+app.config['MYSQL_HOST'] = '192.168.160.129'
+app.config['MYSQL_USER'] = 'app1'
+app.config['MYSQL_PASSWORD'] = 'app1@123'
+app.config['MYSQL_DB'] = 'appdata'
+
+mysql = MySQL(app)
+
+
+@app.route('/app1', methods=['GET', 'POST'])
+def index():
+    if request.method == "POST":
+        details = request.form
+        firstName = details['fname']
+        lastName = details['lname']
+        cur = mysql.connection.cursor()
+        cur.execute("INSERT INTO MyUsers (FirstName, LastName) VALUES (%s, %s)", (firstName, lastName))
+        mysql.connection.commit()
+        cur.close()
+        return 'success'
+    return render_template('index.html')
+```
+2. Now create a template directory as we mention that path for html page.
+```bash
+cd /app1
+mkdir templates
+cd templates
+vi index.html
+# enter below code for html page
+<HTML>
+    <BODY bgcolor="cyan">
+    <form method="POST" action="">
+        <center>
+        <H1>Enter your details </H1> <br>
+        First Name <input type = "text" name= "fname" /> <br>
+        Last Name <input type = "text" name = "lname" /> <br>
+        <input type = "submit">
+        </center>
+    </form>
+    </BODY>
+    </HTML>
+```
+3. To integrate mysql db and flask application we have to install a package.
+```bash
+pip3 install flask-mysqldb
+```
+4. Now restart the application
+```
+systemctl daemon-reload
+systemctl restart app1
+```
+![preview](images/linux66.png)
+
+* We could not access the application because we didn't open mysql port in VM-02.
+```bash
+firewall-cmd --zone=public --add-port=3306/tcp --permanent
+firewall-cmd --reload
+```
+![preview](images/linux67.png)
+
+*  Now check the application page
+  
+  ![preview](images/linux68.png)
+  ![preview](images/linux69.png)
+
+* Now check the database if the details are fetched or not.
+  
+  [preview](images/linux70.png)
+
+* Now do the same process in VM-02.

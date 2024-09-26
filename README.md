@@ -360,3 +360,169 @@ WantedBy=multi-user.target
 ```
 
 ![preview](images/linux50.png)
+
+### Configuring LoadBalancer
+* Ratherthan using two different ip addresses we can use same ip address and change the paths for different services of an application.
+* We can achive this using nginx as Application loadbalancer on webserver.
+* In **Vm-01** do the following steps:
+```bash
+yum install nginx -y
+firewall-cmd --zone=public --add-port=80.tcp --permanent
+systemctl start nginx
+systemctl status nginx
+```
+  
+  ![preview](images/linux51.png)
+  ![preview](images/linux52.png)
+
+* Now edit the nginx.config file 
+```bash
+vi /etc/nginx/nginx.config
+# For more information on configuration, see:
+#   * Official English Documentation: http://nginx.org/en/docs/
+#   * Official Russian Documentation: http://nginx.org/ru/docs/
+
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+# Load dynamic modules. See /usr/share/doc/nginx/README.dynamic.
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile            on;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   65;
+    types_hash_max_size 2048;
+
+    include             /etc/nginx/mime.types;
+    default_type        application/octet-stream;
+
+    # Load modular configuration files from the /etc/nginx/conf.d directory.
+    # See http://nginx.org/en/docs/ngx_core_module.html#include
+    # for more information.
+    include /etc/nginx/conf.d/*.conf;
+
+
+
+    server {
+listen 80;
+server_name 192.168.160.128 ;
+location /app2 {
+
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        #proxy_pass http://unix:/app/app.sock;
+        proxy_pass http://192.168.160.129:5000;   
+        }
+location /app1 {
+
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        #proxy_pass http://unix:/app/app.sock;
+        proxy_pass http://192.168.160.128:5001;   
+        }
+}
+    #server {
+    #    listen       80 default_server;
+    #    listen       [::]:80 default_server;
+    #    server_name  _;
+    #    root         /usr/share/nginx/html;
+
+        # Load configuration files for the default server block.
+     #   include /etc/nginx/default.d/*.conf;
+
+      #  location / {
+      #  }
+
+       # error_page 404 /404.html;
+       #     location = /40x.html {
+       # }
+
+        #error_page 500 502 503 504 /50x.html;
+        #    location = /50x.html {
+        #}
+#    }
+
+# Settings for a TLS enabled server.
+#
+#    server {
+#        listen       443 ssl http2 default_server;
+#        listen       [::]:443 ssl http2 default_server;
+#        server_name  _;
+#        root         /usr/share/nginx/html;
+#
+#        ssl_certificate "/etc/pki/nginx/server.crt";
+#        ssl_certificate_key "/etc/pki/nginx/private/server.key";
+#        ssl_session_cache shared:SSL:1m;
+#        ssl_session_timeout  10m;
+#        ssl_ciphers PROFILE=SYSTEM;
+#        ssl_prefer_server_ciphers on;
+#
+#        # Load configuration files for the default server block.
+#        include /etc/nginx/default.d/*.conf;
+#
+#        location / {
+#        }
+#
+#        error_page 404 /404.html;
+#            location = /40x.html {
+#        }
+#
+#        error_page 500 502 503 504 /50x.html;
+#            location = /50x.html {
+#        }
+#    }
+
+}
+```
+* After editing the `nginx.conf` file, Restart the nginx. `systemcl restart nginx`
+* Check the application page is running or not. `http://192.168.160.128/app1` or `http://192.168.160.128/app1`
+  
+  ![preview](images/linux53.png)
+
+* Our page is still not hitting so we have to check `SELinux`
+* `SELinux` (Security-Enhanced Linux) is a security feature in Linux that controls what users and programs can access on the system. It helps protect your system from unauthorized access by enforcing strict rules on what can be done.
+* Commands for SELinux,So that we can access the application.
+```bash
+getenforce
+setenforce 0
+getenforce
+```
+  ![preview](images/linux56.png)
+
+* After setting enforce we can access the application through single ip address.
+  
+  ![preview](images/linux54.png)
+  ![preview](images/linux55.png)
+
+### Setting a DNS for the application.
+* Open Notepad (Run as Administrator) --> Files --> Open --> Local disk (C) --> Windows --> System32 --> etc-->hosts
+* add ipaddress and dns in last of the hosts file.
+  
+  ![preview](images/linux58.png)
+
+* Now restart the nginx and check the nginx npage with the dns you have given.
+  
+  ![preview](images/linux60.png)
+  ![preview](images/linux59.png)
+  ![preview](images/linux61.png)
+

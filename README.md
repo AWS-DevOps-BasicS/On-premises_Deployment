@@ -658,3 +658,76 @@ firewall-cmd --reload
   [preview](images/linux70.png)
 
 * Now do the same process in VM-02.
+* In database server 
+```sql  
+CREATE USER 'app2'@'192.168.160.129' IDENTIFIED BY 'App2@1234!';
+GRANT ALL PRIVILEGES ON appdata.* TO 'app2'@'192.168.160.129';
+FLUSH PRIVILEGES;
+SHOW GRANTS FOR 'app2'@'192.168.160.129';
+```
+![preview](images/linux71.png)
+
+#### Steps in Vm-02 for application:
+1. In Vm-02, change the code in main.py use below code.
+
+```python
+from flask import Flask, render_template, request
+from flask_mysqldb import MySQL
+app = Flask(__name__, template_folder='/app2/templates/')
+
+
+app.config['MYSQL_HOST'] = '192.168.160.129'
+app.config['MYSQL_USER'] = 'app2'
+app.config['MYSQL_PASSWORD'] = 'App2@1234!'
+app.config['MYSQL_DB'] = 'appdata'
+
+mysql = MySQL(app)
+
+
+@app.route('/app2', methods=['GET', 'POST'])
+def index():
+    if request.method == "POST":
+        details = request.form
+        firstName = details['fname']
+        lastName = details['lname']
+        cur = mysql.connection.cursor()
+        cur.execute("INSERT INTO MyUsers (FirstName, LastName) VALUES (%s, %s)", (firstName, lastName))
+        mysql.connection.commit()
+        cur.close()
+        return 'success'
+    return render_template('index.html')
+```
+2. Now create a template directory as we mention that path for html page.
+```bash
+cd /app2
+mkdir templates
+cd templates
+vi index.html
+# enter below code for html page
+<HTML>
+    <BODY bgcolor="cyan">
+    <form method="POST" action="">
+        <center>
+        <H1>Enter your details </H1> <br>
+        First Name <input type = "text" name= "fname" /> <br>
+        Last Name <input type = "text" name = "lname" /> <br>
+        <input type = "submit">
+        </center>
+    </form>
+    </BODY>
+    </HTML>
+```
+3. To integrate mysql db and flask application we have to install a package.
+```bash
+pip3 install flask-mysqldb
+```
+4. Now restart the application
+```
+systemctl daemon-reload
+systemctl restart app2
+```
+5. Check the URL,database table
+  
+  ![preview](images/linux72.png)
+  ![preview](images/linux73.png)
+  ![preview](images/linux74.png)
